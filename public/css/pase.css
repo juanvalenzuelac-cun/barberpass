@@ -1,0 +1,24 @@
+/* Pase de fidelización (Wallet): mismo diseño en todas las páginas */
+.pase {
+  --pase: #3B1D14; --pase2: #F2C879;
+  background: var(--pase); color: #fff; border-radius: 18px; padding: 20px 22px 18px;
+  display: grid; gap: 18px; box-shadow: 0 20px 40px -24px rgba(0, 0, 0, .7);
+  font-family: "Inter", system-ui, sans-serif;
+}
+.pase-cab { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+.pase-nombre { font-weight: 700; letter-spacing: .16em; text-transform: uppercase; font-size: .95rem; padding-top: 6px; }
+.pase-cuenta { text-align: right; line-height: 1.1; }
+.pase-cuenta small { display: block; color: var(--pase2); font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.pase-cuenta b { font-size: 1.45rem; }
+.pase-sellos { list-style: none; margin: 0 auto; padding: 0; display: grid; grid-template-columns: repeat(var(--cols, 4), 46px); gap: 12px; justify-content: center; }
+.pase-sello {
+  width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center;
+  border: 1.5px dashed var(--pase2); color: var(--pase2); opacity: .7;
+}
+.pase-sello .ico { opacity: 0; }
+.pase-sello:last-child .ico { opacity: 1; }
+.pase-sello.lleno { background: var(--pase2); border-style: solid; color: var(--pase); opacity: 1; }
+.pase-sello.lleno .ico { opacity: 1; }
+.pase-pie { display: flex; justify-content: space-between; gap: 12px; font-size: .85rem; opacity: .85; flex-wrap: wrap; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-width: 380px) { .pase-sellos { grid-template-columns: repeat(var(--cols, 4), 40px); gap: 9px; } .pase-sello { width: 40px; height: 40px; } }

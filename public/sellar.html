@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#121A24">
+  <title>BarberPass · Sellar mi tarjeta</title>
+  <link rel="icon" href="img/icono.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/pase.css">
+</head>
+<body>
+  <div class="app">
+    <main class="vista" style="padding-bottom:32px">
+      <header class="titulo"><div><h1>Sellar mi tarjeta</h1><p id="contexto">Cargando…</p></div></header>
+      <form id="formulario" style="display:grid;gap:18px" novalidate>
+        <div class="campo"><label for="celular">Tu celular</label>
+          <input class="entrada" id="celular" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="300 123 4567" required></div>
+        <div id="datos-nuevo" style="display:grid;gap:18px" hidden>
+          <div class="campo"><label for="nombres">Nombre</label><input class="entrada" id="nombres" autocomplete="given-name"></div>
+          <div class="campo"><label for="apellidos">Apellido</label><input class="entrada" id="apellidos" autocomplete="family-name"></div>
+        </div>
+        <div id="mensaje" aria-live="polite"></div>
+        <button class="btn bloque" id="enviar" type="submit">Sellar mi tarjeta</button>
+      </form>
+      <p class="suave" style="font-size:.92rem">Tu celular es tu identificación en todas las barberías de BarberPass. Si tu teléfono tiene NFC, la próxima vez el barbero puede sellar acercando su tarjeta.</p>
+    </main>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script>
+  (function () {
+    const $ = id => document.getElementById(id);
+    const q = new URLSearchParams(location.search);
+    const cred = Number(q.get('c')), token = q.get('t'), serv = Number(q.get('s'));
+    const esApple = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const guardado = BP.leer('celular');
+    if (guardado) $('celular').value = guardado;
+
+    function aviso(texto, tipo) {
+      $('mensaje').innerHTML = texto ? '<p class="aviso ' + (tipo || '') + '">' + BP.esc(texto) + '</p>' : '';
+    }
+
+    async function contexto() {
+      if (!cred || !token || !serv) {
+        $('contexto').textContent = 'Este enlace no trae un código válido. Escanea el QR que muestra el barbero.';
+        $('formulario').hidden = true;
+        return;
+      }
+      if (!BP.configurado) { BP.avisoConfig($('mensaje')); return; }
+      try {
+        const [b] = await BP.vista('v_barberos_qr', { id_credencial: 'eq.' + cred });
+        const [s] = await BP.vista('v_servicios', { id_servicio: 'eq.' + serv });
+        $('contexto').textContent = b
+          ? b.barberia + ' · ' + (s ? s.nombre : 'servicio') + ' con ' + b.barbero.split(' ')[0]
+          : 'Barbería no encontrada.';
+      } catch (e) { $('contexto').textContent = ''; aviso(e.message, 'error'); }
+    }
+
+    $('formulario').addEventListener('submit', async ev => {
+      ev.preventDefault();
+      const boton = $('enviar');
+      boton.disabled = true; boton.textContent = 'Sellando…'; aviso('');
+      try {
+        const r = await BP.rpc('sellar_con_qr', {
+          p_id_credencial: cred, p_token: token, p_id_servicio: serv,
+          p_celular: $('celular').value,
+          p_nombres: $('nombres').value || null, p_apellidos: $('apellidos').value || null,
+          p_plataforma: esApple ? 'APPLE' : 'GOOGLE'
+        });
+        if (r.estado === 'cliente_nuevo') {
+          $('datos-nuevo').hidden = false;
+          aviso(r.mensaje);
+          $('nombres').focus();
+        } else if (r.estado === 'ok') {
+          BP.guardar('celular', $('celular').value);
+          try {
+            await Promise.race([
+              fetch('/api/google-wallet', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ codigo: r.codigo_wallet }) }),
+              new Promise(res => setTimeout(res, 2500))
+            ]);
+          } catch (e) { /* la sincronización con Wallet es opcional */ }
+          location.href = 'tarjeta.html?codigo=' + encodeURIComponent(r.codigo_wallet) + '&nuevo=1';
+          return;
+        } else {
+          aviso(r.mensaje, 'error');
+        }
+      } catch (e) { aviso(e.message, 'error'); }
+      boton.disabled = false; boton.textContent = 'Sellar mi tarjeta';
+    });
+
+    contexto();
+  })();
+  </script>
+</body>
+</html>

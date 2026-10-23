@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#121A24">
+  <title>Mi tarjeta BarberPass</title>
+  <link rel="icon" href="img/icono.png">
+  <link rel="apple-touch-icon" href="img/icono.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Mi tarjeta">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/pase.css">
+  <style>
+    .qr-pase { background: #fff; border-radius: 16px; padding: 14px; width: 190px; margin: 0 auto; }
+    .qr-pase svg { display: block; width: 100%; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <main class="vista" style="padding-bottom:32px">
+      <header class="titulo"><div><h1 id="titulo">Mi tarjeta</h1><p id="estado" aria-live="polite"></p></div></header>
+      <div id="tarjeta"><p class="suave">Cargando tu tarjeta…</p></div>
+      <section id="extra" style="display:grid;gap:14px" hidden>
+        <div class="qr-pase" id="qr-pase" title="El barbero puede escanear este código"></div>
+        <p class="suave" style="text-align:center;font-size:.9rem">El barbero puede escanear este código para sumar tu sello.</p>
+        <button class="btn bloque" id="google" type="button">Agregar a Google Wallet</button>
+        <div id="wallet-msg" aria-live="polite"></div>
+        <p class="suave" style="font-size:.9rem" id="nota-apple"></p>
+      </section>
+    </main>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/iconos.js"></script>
+  <script src="js/qr.js"></script>
+  <script src="js/tarjeta.js"></script>
+  <script>
+  (function () {
+    const $ = id => document.getElementById(id);
+    const q = new URLSearchParams(location.search);
+    const codigo = q.get('codigo');
+    const esApple = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    if (q.get('nuevo')) $('estado').textContent = 'Sello registrado.';
+
+    async function cargar() {
+      if (!codigo) { $('tarjeta').innerHTML = '<p class="aviso error">Falta el código de la tarjeta en el enlace.</p>'; return; }
+      if (!BP.configurado) return BP.avisoConfig($('tarjeta'));
+      try {
+        const t = await BP.rpc('tarjeta_por_codigo', { p_codigo: codigo });
+        if (t.estado !== 'ok') throw new Error(t.mensaje);
+        $('titulo').textContent = t.barberia;
+        document.title = 'Mi tarjeta · ' + t.barberia;
+        $('tarjeta').innerHTML = BPTarjeta(t);
+        if ($('extra').hidden) $('qr-pase').innerHTML = BPQR.svg(t.codigo_wallet, { margen: 1, etiqueta: 'Código de tu pase' });
+        $('extra').hidden = false;
+      } catch (e) { $('tarjeta').innerHTML = '<p class="aviso error">' + BP.esc(e.message) + '</p>'; }
+    }
+
+    $('nota-apple').textContent = esApple
+      ? 'En iPhone: toca Compartir y luego "Agregar a pantalla de inicio" para tener esta tarjeta siempre a mano. Apple Wallet se activa cuando la barbería tenga su cuenta de desarrollador de Apple.'
+      : 'En iPhone la tarjeta se guarda en la pantalla de inicio. Apple Wallet se activa cuando la barbería tenga su cuenta de desarrollador de Apple.';
+
+    $('google').addEventListener('click', async () => {
+      const b = $('google');
+      b.disabled = true; $('wallet-msg').innerHTML = '';
+      try {
+        const r = await fetch('/api/google-wallet?codigo=' + encodeURIComponent(codigo));
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.url) throw new Error(j.mensaje || 'Google Wallet no está disponible en este momento.');
+        location.href = j.url;
+      } catch (e) {
+        $('wallet-msg').innerHTML = '<p class="aviso error">' + BP.esc(e.message) + '</p>';
+        b.disabled = false;
+      }
+    });
+
+    // Si Google Wallet no está configurado en el sitio, se oculta el botón
+    fetch('/api/estado').then(r => r.ok ? r.json() : null).then(e => {
+      if (e && !e.google_wallet) $('google').hidden = true;
+    }).catch(() => {});
+
+    cargar();
+    setInterval(cargar, 15000);
+  })();
+  </script>
+</body>
+</html>

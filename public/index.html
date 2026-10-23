@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BarberPass · Tablero del proyecto</title>
+  <meta name="description" content="Base de datos de fidelización para barberías: preguntas del negocio respondidas con SQL en vivo desde Supabase.">
+  <link rel="icon" href="img/icono.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/estilo.css">
+  <style>
+    .rejilla { display: grid; grid-template-columns: 300px 1fr; gap: 28px; align-items: start; }
+    .indice { position: sticky; top: 16px; }
+    .indice h3 { margin: 18px 0 8px; font-size: 1rem; color: var(--tinta-suave); font-family: var(--letra); font-weight: 600; }
+    .indice h3:first-child { margin-top: 0; }
+    .indice ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+    .indice button {
+      width: 100%; text-align: left; font: 500 .95rem/1.35 var(--letra); color: var(--tinta);
+      background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 10px 12px; cursor: pointer;
+      display: grid; grid-template-columns: 34px 1fr; gap: 6px;
+    }
+    .indice button:hover { background: var(--papel); border-color: var(--borde); }
+    .indice button[aria-current="true"] { background: var(--cuero-claro); border-color: var(--laton); }
+    .indice .cod { font-weight: 700; color: var(--laton); }
+    .detalle { padding: 24px; display: grid; gap: 18px; min-width: 0; }
+    .detalle .cod { font-weight: 700; color: var(--laton); font-size: 1.1rem; }
+    .detalle .meta { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; }
+    .demo { margin: 36px 0 48px; padding: 24px; display: grid; grid-template-columns: minmax(240px, 360px) 1fr; gap: 28px; }
+    .demo > div { min-width: 0; }
+    .demo p { margin-top: 8px; }
+    .demo .acciones { margin-top: 18px; }
+    .pie { padding: 24px 0 40px; color: var(--tinta-suave); font-size: .9rem; }
+    @media (max-width: 860px) {
+      h1 { font-size: 2rem; }
+      .rejilla, .demo { grid-template-columns: 1fr; }
+      .indice { position: static; }
+      .indice ol { grid-auto-flow: column; grid-auto-columns: minmax(220px, 1fr); overflow-x: auto; padding-bottom: 6px; }
+      .detalle { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="poste" aria-hidden="true"></div>
+  <div class="contenedor">
+    <header class="cabecera">
+      <div class="marca">
+        <h1>BarberPass</h1>
+        <p>Base de datos de fidelización para barberías. Proyecto de curso de Bases de Datos, CUN.</p>
+        <p class="suave" id="equipo"></p>
+      </div>
+      <nav aria-label="Secciones">
+        <a class="boton secundario" href="admin.html">Administración</a>
+        <a class="boton" href="app.html">App del barbero</a>
+      </nav>
+    </header>
+
+    <section class="cifras" id="cifras" aria-label="Cifras de la base de datos">
+      <div class="cifra"><b class="num">…</b><span>Cargando datos de Supabase</span></div>
+    </section>
+
+    <div class="rejilla">
+      <aside class="indice" aria-label="Consultas">
+        <h3>Preguntas del negocio</h3>
+        <ol id="lista-p"></ol>
+        <h3>Consultas básicas</h3>
+        <ol id="lista-b"></ol>
+      </aside>
+      <section class="panel detalle" id="detalle" aria-live="polite"></section>
+    </div>
+
+    <section class="panel demo" aria-labelledby="titulo-demo">
+      <div>
+        <h2 id="titulo-demo">Sellos en vivo</h2>
+        <p class="suave">Cada fila es una visita registrada en la tabla <b>visita</b>. Durante la presentación, escanea el QR de la app del barbero (Mi QR) con tu celular y tu sello aparece aquí en segundos.</p>
+        <div class="acciones"><a class="boton secundario" href="app.html#qr">Abrir Mi QR</a></div>
+      </div>
+      <div id="ultimos"></div>
+    </section>
+
+    <footer class="pie">
+      Datos servidos desde Supabase (PostgreSQL). Los celulares se muestran enmascarados porque la página es pública.
+    </footer>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/consultas.js"></script>
+  <script>
+  (function () {
+    const C = window.BP_CONSULTAS;
+    const dinero = new Set(['ingresos', 'facturado', 'precio', 'precio_promedio']);
+    const nombres = {
+      barberia: 'Barbería', barbero: 'Barbero', visitas: 'Visitas', ingresos: 'Ingresos', puesto: 'Puesto',
+      cliente: 'Cliente', celular: 'Celular', disponibles: 'Sellos disponibles', sellos_requeridos: 'Sellos requeridos',
+      faltan: 'Faltan', servicio: 'Servicio', veces_vendido: 'Veces vendido', facturado: 'Facturado',
+      precio_promedio: 'Precio promedio', ultima_visita: 'Última visita', dias_sin_volver: 'Días sin volver',
+      tarjetas_emitidas: 'Tarjetas emitidas', premios_canjeados: 'Premios canjeados', clientes_premiados: 'Clientes premiados',
+      tasa_canje_pct: 'Tasa de canje (%)', nombre: 'Servicio', precio: 'Precio', duracion_min: 'Duración (min)',
+      tipo: 'Tipo', estado: 'Estado', fecha_asignacion: 'Asignada', apple: 'Apple Wallet', google: 'Google Wallet',
+      total: 'Total', sellos_nfc: 'Sellos por NFC', sellos_qr: 'Sellos por QR', pct_qr: '% por QR'
+    };
+
+    document.getElementById('equipo').textContent = (window.BP_CONFIG || {}).EQUIPO || '';
+
+    function columnas(filas) {
+      return Object.keys(filas[0] || {}).map(k => {
+        const n = typeof filas[0][k] === 'number' || (filas[0][k] !== null && filas[0][k] !== '' && !isNaN(filas[0][k]) && !/celular/.test(k));
+        return { k, t: nombres[k] || k, n, fmt: dinero.has(k) ? v => BP.cop(v) : null };
+      });
+    }
+
+    function lista(prefijo, el) {
+      el.innerHTML = C.filter(c => c.id[0] === prefijo).map(c =>
+        '<li><button type="button" data-id="' + c.id + '"><span class="cod">' + c.codigo + '</span><span>' + BP.esc(c.pregunta) + '</span></button></li>'
+      ).join('');
+    }
+    lista('p', document.getElementById('lista-p'));
+    lista('b', document.getElementById('lista-b'));
+
+    const detalle = document.getElementById('detalle');
+    async function mostrar(id) {
+      const c = C.find(x => x.id === id);
+      document.querySelectorAll('.indice button').forEach(b => b.setAttribute('aria-current', b.dataset.id === id ? 'true' : 'false'));
+      try { history.replaceState(null, '', '#' + id); } catch (e) { /* sin historial */ }
+      detalle.innerHTML =
+        '<div class="meta"><span class="cod">' + c.codigo + '</span><span class="suave" id="conteo"></span></div>' +
+        '<h2>' + BP.esc(c.pregunta) + '</h2>' +
+        '<p class="suave">' + BP.esc(c.proposito) + '</p>' +
+        '<div id="resultado"><p class="suave">Consultando…</p></div>' +
+        '<details class="ver-sql"><summary>Ver el SQL</summary><pre class="sql"><code>' + BP.esc(c.sql) + '</code></pre></details>';
+      const res = document.getElementById('resultado');
+      if (!BP.configurado) return BP.avisoConfig(res);
+      try {
+        const filas = await BP.vista(c.vista);
+        res.innerHTML = BP.tabla(filas, columnas(filas));
+        document.getElementById('conteo').textContent = filas.length + (filas.length === 1 ? ' fila' : ' filas');
+      } catch (e) {
+        res.innerHTML = '<p class="aviso error">' + BP.esc(e.message) + '</p>';
+      }
+    }
+    document.querySelector('.indice').addEventListener('click', e => {
+      const b = e.target.closest('button[data-id]');
+      if (b) mostrar(b.dataset.id);
+    });
+    const inicial = location.hash.slice(1);
+    mostrar(C.some(c => c.id === inicial) ? inicial : 'p1');
+
+    async function cifras() {
+      const el = document.getElementById('cifras');
+      if (!BP.configurado) { el.innerHTML = '<div class="cifra"><b>Sin conexión</b><span>Configura js/config.js</span></div>'; return; }
+      try {
+        const r = (await BP.vista('v_resumen'))[0];
+        const pct = r.sellos ? Math.round(100 * r.sellos_qr / r.sellos) : 0;
+        el.innerHTML = [
+          [r.barberias, 'barberías'], [r.clientes, 'clientes'], [r.tarjetas, 'tarjetas en Wallet'],
+          [r.sellos, 'sellos registrados'], [pct + ' %', 'de los sellos por QR'], [r.canjes, 'premios canjeados']
+        ].map(([v, t]) => '<div class="cifra"><b class="num">' + BP.esc(v) + '</b><span>' + t + '</span></div>').join('');
+      } catch (e) { el.innerHTML = '<p class="aviso error">' + BP.esc(e.message) + '</p>'; }
+    }
+
+    let vistos = null;
+    async function ultimos() {
+      const el = document.getElementById('ultimos');
+      if (!BP.configurado) return BP.avisoConfig(el);
+      try {
+        const filas = await BP.vista('v_ultimos_sellos');
+        const nuevos = vistos ? filas.filter(f => !vistos.has(f.id_visita)).length : 0;
+        el.innerHTML = BP.tabla(filas, [
+          { k: 'fecha_hora', t: 'Hora', fmt: v => BP.hora(v) },
+          { k: 'cliente', t: 'Cliente' }, { k: 'barberia', t: 'Barbería' },
+          { k: 'barbero', t: 'Barbero' }, { k: 'metodo', t: 'Método' }, { k: 'servicios', t: 'Servicios' }
+        ], { claseFila: f => (vistos && !vistos.has(f.id_visita)) ? 'nuevo' : '' });
+        vistos = new Set(filas.map(f => f.id_visita));
+        if (nuevos) cifras();
+      } catch (e) { el.innerHTML = '<p class="aviso error">' + BP.esc(e.message) + '</p>'; }
+    }
+    cifras();
+    ultimos();
+    setInterval(ultimos, 8000);
+  })();
+  </script>
+</body>
+</html>
