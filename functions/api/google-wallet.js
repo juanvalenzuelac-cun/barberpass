@@ -37,7 +37,7 @@ export async function onRequestPost({ request, env }) {
   try {
     const t = await tarjeta(env, codigo);
     const acceso = await tokenAcceso(env);
-    const ok = await actualizarObjeto(env, t, acceso);
+    const ok = await actualizarObjeto(env, t, acceso, new URL(request.url).origin);
     return json({ sincronizado: ok, sellos: t.sellos });
   } catch (e) {
     return json({ sincronizado: false, mensaje: e.message }, 502);

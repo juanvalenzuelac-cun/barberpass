@@ -88,10 +88,20 @@ export function clase(env, t, origen) {
   };
 }
 
+// Imagen con la fila de sellos (la dibuja /api/sellos); la URL cambia con cada sello
+export function urlSellos(t, origen) {
+  const q = new URLSearchParams({
+    s: String(Math.min(Number(t.sellos), Number(t.requeridos))), r: String(t.requeridos),
+    c: String(t.color || '#1A1A1A').replace('#', ''), c2: String(t.color2 || '#C9A35B').replace('#', '')
+  });
+  return new URL('/api/sellos?' + q.toString(), origen).toString();
+}
+
 // Campos que cambian con cada sello
-export function camposVariables(t) {
+export function camposVariables(t, origen) {
   const faltan = Math.max(0, Number(t.requeridos) - Number(t.sellos));
   return {
+    heroImage: { sourceUri: { uri: urlSellos(t, origen) } },
     loyaltyPoints: { label: 'Sellos', balance: { string: t.sellos + ' de ' + t.requeridos } },
     textModulesData: [
       { id: 'premio', header: 'Premio', body: t.premio },
@@ -110,7 +120,7 @@ export function objeto(env, t, origen) {
     accountName: t.cliente,
     barcode: { type: 'QR_CODE', value: t.codigo_wallet, alternateText: t.codigo_wallet },
     linksModuleData: { uris: [{ id: 'tarjeta', uri: enlace, description: 'Ver mi tarjeta' }] }
-  }, camposVariables(t));
+  }, camposVariables(t, origen));
 }
 
 // Crea la clase de la barbería si no existe (409 = ya existe)
@@ -124,11 +134,11 @@ export async function asegurarClase(env, t, origen, acceso) {
 }
 
 // Actualiza los sellos de una tarjeta ya guardada. Devuelve false si el cliente aún no la guarda.
-export async function actualizarObjeto(env, t, acceso) {
+export async function actualizarObjeto(env, t, acceso, origen) {
   const r = await fetch(WALLET_API + '/loyaltyObject/' + encodeURIComponent(idObjeto(env, t)), {
     method: 'PATCH',
     headers: { Authorization: 'Bearer ' + acceso, 'Content-Type': 'application/json' },
-    body: JSON.stringify(camposVariables(t))
+    body: JSON.stringify(camposVariables(t, origen))
   });
   if (r.status === 404) return false;
   if (!r.ok) throw new Error('Google Wallet (actualizar): ' + r.status + ' ' + (await r.text()).slice(0, 200));
